@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Dashboard - Developer Applicants</title>
+    
+    <!-- Firebase Compat SDK -->
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
+
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        
+        body {
+            background-color: #f4f6f9;
+            color: #333;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+        }
+
+        /* Password Modal Styling */
+        #auth-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: #121212;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+        }
+
+        .auth-card {
+            background: #242424;
+            padding: 30px;
+            border-radius: 12px;
+            width: 90%;
+            max-width: 380px;
+            text-align: center;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+        }
+
+        .auth-card h2 {
+            color: #e50914;
+            font-size: 22px;
+            margin-bottom: 15px;
+        }
+
+        .auth-card input {
+            width: 100%;
+            padding: 12px;
+            border-radius: 6px;
+            border: none;
+            background: #333;
+            color: #fff;
+            font-size: 15px;
+            margin-bottom: 15px;
+            outline: none;
+            text-align: center;
+        }
+
+        .auth-card button {
+            width: 100%;
+            padding: 12px;
+            background-color: #e50914;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-weight: bold;
+            cursor: pointer;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .auth-card button:hover {
+            background-color: #f6121d;
+        }
+
+        .error-msg {
+            color: #ff4d4d;
+            font-size: 13px;
+            margin-top: 10px;
+            display: none;
+        }
+
+        /* Main Dashboard (Hidden until unlocked) */
+        #main-dashboard {
+            display: none;
+            width: 100%;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        h1 {
+            color: #e50914;
+            font-size: 28px;
+            font-weight: 800;
+            text-transform: uppercase;
+            margin-bottom: 20px;
+            text-align: center;
+            letter-spacing: 1px;
+        }
+        
+        .search-container {
+            width: 100%;
+            max-width: 600px;
+            margin-bottom: 20px;
+        }
+
+        .search-box {
+            width: 100%;
+            padding: 12px 16px;
+            border: 1px solid #ccc;
+            border-radius: 8px;
+            font-size: 15px;
+            outline: none;
+            background: #fff;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+            transition: all 0.3s;
+        }
+
+        .search-box:focus {
+            border-color: #e50914;
+            box-shadow: 0 0 8px rgba(229, 9, 20, 0.3);
+        }
+
+        .applicants-container {
+            width: 100%;
+            max-width: 600px;
+            max-height: 70vh;
+            overflow-y: auto;
+            padding-right: 5px;
+        }
+
+        .applicants-container::-webkit-scrollbar { width: 6px; }
+        .applicants-container::-webkit-scrollbar-track { background: rgba(0,0,0,0.05); border-radius: 10px; }
+        .applicants-container::-webkit-scrollbar-thumb { background: #e50914; border-radius: 10px; }
+
+        .card {
+            background: #fff;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 15px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+            border-left: 5px solid #e50914;
+            position: relative;
+        }
+
+        .card h3 {
+            font-size: 18px;
+            color: #111;
+            margin-bottom: 12px;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 8px;
+        }
+
+        .card p {
+            font-size: 14px;
+            margin-bottom: 6px;
+            color: #444;
+        }
+
+        .card p strong {
+            color: #111;
+        }
+
+        .timestamp {
+            font-size: 11px;
+            color: #888;
+            text-align: right;
+            margin-top: 10px;
+        }
+
+        .no-data {
+            text-align: center;
+            color: #777;
+            padding: 40px;
+            font-size: 15px;
+            background: #fff;
+            border-radius: 8px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Password Prompt Screen -->
+    <div id="auth-overlay">
+        <div class="auth-card">
+            <h2>Admin Access</h2>
+            <input type="password" id="passwordInput" placeholder="Enter Admin Password">
+            <button onclick="checkPassword()">Login</button>
+            <div id="errorMsg" class="error-msg">Incorrect Password! Try again.</div>
+        </div>
+    </div>
+
+    <!-- Main Dashboard Screen -->
+    <div id="main-dashboard">
+        <h1>Admin Dashboard</h1>
+
+        <div class="search-container">
+            <input type="text" id="searchInput" class="search-box" placeholder="Search by name, email, country, or #id...">
+        </div>
+
+        <div class="applicants-container" id="applicantsList">
+            <div class="no-data">Loading applications...</div>
+        </div>
+    </div>
+
+    <script>
+        // Yahan apna password change kar sakta hai
+        const adminPassword = "winds@123";
+
+        function checkPassword() {
+            const enteredPass = document.getElementById('passwordInput').value;
+            const errorMsg = document.getElementById('errorMsg');
+
+            if (enteredPass === adminPassword) {
+                document.getElementById('auth-overlay').style.display = 'none';
+                document.getElementById('main-dashboard').style.display = 'flex';
+                loadFirebaseData(); // Load data only after successful login
+            } else {
+                errorMsg.style.display = 'block';
+                document.getElementById('passwordInput').value = '';
+            }
+        }
+
+        // Allow pressing Enter key to login
+        document.getElementById('passwordInput').addEventListener('keypress', function (e) {
+            if (e.key === 'Enter') {
+                checkPassword();
+            }
+        });
+
+        function loadFirebaseData() {
+            const firebaseConfig = {
+                apiKey: "AIzaSyCa0A0fuxJ-DbbTi6wrk0ts2UU_hHdT5SI",
+                authDomain: "adminofsw.firebaseapp.com",
+                databaseURL: "https://adminofsw-default-rtdb.firebaseio.com",
+                projectId: "adminofsw",
+                storageBucket: "adminofsw.appspot.com",
+                messagingSenderId: "351370839445",
+                appId: "1:351370839445:web:a5efcd12e6841ae558a29c",
+                measurementId: "G-70J5Y5F519"
+            };
+
+            firebase.initializeApp(firebaseConfig);
+            const db = firebase.database();
+
+            let allApplicants = [];
+
+            db.ref('applications/').on('value', (snapshot) => {
+                const data = snapshot.val();
+                allApplicants = [];
+                
+                if (data) {
+                    const keys = Object.keys(data);
+                    keys.forEach((key, index) => {
+                        allApplicants.push({
+                            id: key,
+                            serialNumber: index + 1,
+                            ...data[key]
+                        });
+                    });
+                    
+                    renderApplicants([...allApplicants].reverse());
+                } else {
+                    document.getElementById('applicantsList').innerHTML = '<div class="no-data">No applications found.</div>';
+                }
+            });
+
+            function renderApplicants(applicants) {
+                const container = document.getElementById('applicantsList');
+                container.innerHTML = '';
+
+                if (applicants.length === 0) {
+                    container.innerHTML = '<div class="no-data">No matching applications found.</div>';
+                    return;
+                }
+
+                applicants.forEach((app) => {
+                    const card = document.createElement('div');
+                    card.className = 'card';
+                    card.innerHTML = `
+                        <h3>#${app.serialNumber} - ${app.name || 'Unknown'}</h3>
+                        <p><strong>Email Address:</strong> ${app.email || 'N/A'}</p>
+                        <p><strong>Age:</strong> ${app.age || 'N/A'} Years</p>
+                        <p><strong>Location/Country:</strong> ${app.country || 'N/A'}</p>
+                        <p><strong>Work Track:</strong> ${app.workType || 'None selected'}</p>
+                        <p><strong>Reason to choose us:</strong> ${app.whyChooseUs || 'N/A'}</p>
+                        <div class="timestamp">Submitted on: ${app.timestamp || 'N/A'}</div>
+                    `;
+                    container.appendChild(card);
+                });
+            }
+
+            const searchInput = document.getElementById('searchInput');
+            searchInput.addEventListener('input', (e) => {
+                const query = e.target.value.toLowerCase().trim();
+                
+                const filtered = allApplicants.filter(app => {
+                    const name = (app.name || '').toLowerCase();
+                    const email = (app.email || '').toLowerCase();
+                    const country = (app.country || '').toLowerCase();
+                    const workType = (app.workType || '').toLowerCase();
+                    const serial = app.serialNumber.toString();
+
+                    return name.includes(query) || 
+                           email.includes(query) || 
+                           country.includes(query) || 
+                           workType.includes(query) || 
+                           serial.includes(query) ||
+                           `#${serial}`.includes(query);
+                });
+
+                renderApplicants([...filtered].reverse());
+            });
+        }
+    </script>
+</body>
+</html>
